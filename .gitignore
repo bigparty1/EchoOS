@@ -1,0 +1,13 @@
+# Ignorar pastas de build e output
+build/
+bin/
+dist/
+*.o
+*.iso
+*.bin
+
+# Ignorar arquivos do VS Code
+.vscode/
+
+# Ignorar arquivos temporários do sistema
+.DS_Store
