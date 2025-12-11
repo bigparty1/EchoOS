@@ -19,15 +19,22 @@ init_segments:
     mov sp, 0x7C00                              ; Inicializa o ponteiro de pilha
     sti                                         ; Habilita interrupções
 
+    call delay_0_5s                             ; Espera 0,5 segundos
+
     mov [BOOT_DISK], dl                         ; Armazena o ID do disco de boot
 
     mov bx, MSG_LOADING                         ; Mensagem de carregamento
     call print_string                           ; Imprime a mensagem de carregamento
 
+    call delay_0_5s                             ; Espera 0,5 segundos
+
     call read_disk                              ; Lê o kernel do disco para a memória
 
+    call delay_0_5s                             ; Espera 0,5 segundos
     mov bx, MSG_SUCCESS                         ; Mensagem de sucesso
     call print_string                           ; Imprime a mensagem de sucesso
+
+    call delay_0_5s                             ; Espera 0,5 segundos
 
     ; Aqui, futuramente, vamos mudar para 32-bits/64-bits 
     ; e mover o kernel de 0x1000 para 0x100000 (1MB)
@@ -69,6 +76,25 @@ print_string:
     jmp .loop_print                       ; Repete
 .done_print:
     pop bx
+    pop ax
+    ret
+
+; Espera 1,5 segundos
+delay_0_5s:
+    push cx
+    push dx
+    mov cx, 0x0007
+    mov dx, 0xA120
+    call wait_time
+    pop dx
+    pop cx
+    ret
+
+; Espera em microsegundos, tempo definido em cx:dx, sendo cx a parte alta e dx a baixa
+wait_time:
+    push ax
+    mov ah, 0x86                          ; Função de espera
+    int 0x15                              ; Chamada de interrupção do BIOS
     pop ax
     ret
 
