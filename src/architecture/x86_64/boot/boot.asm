@@ -79,7 +79,7 @@ print_string:
     pop ax
     ret
 
-; Espera 1,5 segundos
+; Espera 0,5 segundos
 delay_0_5s:
     push cx
     push dx
