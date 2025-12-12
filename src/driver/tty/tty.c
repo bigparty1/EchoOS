@@ -1,3 +1,9 @@
+/*
+ * Autor: Kauê dos Santos Gomes
+ * Data: 12/12/2025
+ * Descrição: Implementação do driver do terminal tty
+ */
+
 #include "tty.h"
 
 size_t terminal_row;

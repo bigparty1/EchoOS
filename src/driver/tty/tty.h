@@ -1,3 +1,9 @@
+/*
+ * Autor: Kauê dos Santos Gomes
+ * Data: 12/12/2025
+ * Descrição: Definições e protótipos para o driver do terminal tty
+ */
+
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
