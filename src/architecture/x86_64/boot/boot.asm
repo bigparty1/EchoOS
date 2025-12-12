@@ -25,7 +25,6 @@ init_segments:
 
     mov bx, MSG_LOADING                         ; Mensagem de carregamento
     call print_string                           ; Imprime a mensagem de carregamento
-
     call delay_0_5s                             ; Espera 0,5 segundos
 
     call read_disk                              ; Lê o kernel do disco para a memória
@@ -33,7 +32,11 @@ init_segments:
     call delay_0_5s                             ; Espera 0,5 segundos
     mov bx, MSG_SUCCESS                         ; Mensagem de sucesso
     call print_string                           ; Imprime a mensagem de sucesso
+    call delay_0_5s                             ; Espera 0,5 segundos
 
+    call enable_a20                             ; Habilita a linha A20
+    mov bx, MSG_A20_ENABLED                     ; Mensagem A20 habilitado
+    call print_string                           ; Imprime a mensagem A20 habilitado
     call delay_0_5s                             ; Espera 0,5 segundos
 
     ; Aqui, futuramente, vamos mudar para 32-bits/64-bits 
@@ -61,6 +64,24 @@ disk_error:
     mov bx, MSG_ERROR                        ; Mensagem de erro
     call print_string                        ; Imprime a mensagem de erro
     jmp $                                    ; Loop infinito
+
+; Habilitar A20
+enable_a20:
+    push ax
+    
+    ; Método 1
+    mov ax, 0x2401
+    int 0x15                                ; Chamada de interrupção do BIOS para habilitar A20
+    jnc .enable_a20_done
+
+    ; Método 2 (Fallback)
+    in al, 0x92
+    or al, 0x02
+    out 0x92, al
+
+.enable_a20_done:
+    pop ax
+    ret
 
 ; Rotina para imprimir uma string terminada em zero
 print_string:
@@ -103,6 +124,7 @@ BOOT_DISK     db 0                              ; Armazena o ID do disco de boot
 MSG_LOADING   db "Loading Kernel...", 0x0D, 0x0A, 0
 MSG_ERROR     db "Error loading kernel!", 0x0D, 0x0A, 0
 MSG_SUCCESS   db "Kernel loaded successfully!", 0x0D, 0x0A, 0
+MSG_A20_ENABLED db "A20 line enabled.", 0x0D, 0x0A, 0
 
 ; Assinatura para o final do setor de boot
 times 510-($-$$) db 0                      ; Preenche até o byte 510 com zeros
