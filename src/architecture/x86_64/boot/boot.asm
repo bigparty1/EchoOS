@@ -1,131 +1,204 @@
 ;Autor: Kauê dos Santos Gomes
-;Data: 11/12/2025
-;Descrição: Código de boot para arquitetura x86_64
+;Data: 12/12/2025
+;Descrição: Bootloader Completo (Real Mode -> Protected Mode)
 
-[org 0x7C00]                                    ; Endereço de carregamento do bootloader
-KERNEL_LOW_MEM equ 0x1000                       ; Endereço onde o kernel será carregado (temporário, buffer de carga)
+[org 0x7C00]
+[bits 16]          ; Modo Real (16-bits)
+
+KERNEL_LOW_MEM equ 0x1000
 
 start:
-    jmp 0:init_segments                         ; Far jump para inicializar segmentos
+    jmp 0:init_segments
 
 init_segments:
-    cli                                         ; Desabilita interrupções
-    xor ax, ax                                  ; Zera o registrador AX
-    mov ds, ax                                  ; Configura o segmento de dados
-    mov es, ax                                  ; Configura o segmento extra
-    mov fs, ax                                  ; Configura o segmento FS
-    mov gs, ax                                  ; Configura o segmento GS
-    mov ss, ax                                  ; Configura o segmento de pilha
-    mov sp, 0x7C00                              ; Inicializa o ponteiro de pilha
-    sti                                         ; Habilita interrupções
+    ; 1. Inicialização Limpa de Segmentos
+    cli
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+    mov sp, 0x7C00
+    sti
 
-    call delay_0_5s                             ; Espera 0,5 segundos
+    mov [BOOT_DISK], dl         ; Salva o ID do drive de boot
 
-    mov [BOOT_DISK], dl                         ; Armazena o ID do disco de boot
-
-    mov bx, MSG_LOADING                         ; Mensagem de carregamento
-    call print_string                           ; Imprime a mensagem de carregamento
-    call delay_0_5s                             ; Espera 0,5 segundos
-
-    call read_disk                              ; Lê o kernel do disco para a memória
-
-    call delay_0_5s                             ; Espera 0,5 segundos
-    mov bx, MSG_SUCCESS                         ; Mensagem de sucesso
-    call print_string                           ; Imprime a mensagem de sucesso
-    call delay_0_5s                             ; Espera 0,5 segundos
-
-    call enable_a20                             ; Habilita a linha A20
-    mov bx, MSG_A20_ENABLED                     ; Mensagem A20 habilitado
-    call print_string                           ; Imprime a mensagem A20 habilitado
-    call delay_0_5s                             ; Espera 0,5 segundos
-
-    ; Aqui, futuramente, vamos mudar para 32-bits/64-bits 
-    ; e mover o kernel de 0x1000 para 0x100000 (1MB)
+    ; 2. Mensagens Iniciais e Leitura de Disco
+    mov bx, MSG_LOADING
+    call bios_print
+    call bios_wait
     
-    jmp $ ; Loop infinito por enquanto
+    call read_disk
+    
+    ; 3. Habilitar A20
+    mov bx, MSG_A20
+    call bios_print
+    call bios_wait
+    call enable_a20
 
-; Rotina para ler o kernel do disco
+    ; 4. Preparar para a Transição (GDT)
+    mov bx, MSG_GDT
+    call bios_print
+    call bios_wait
+    
+    mov bx, MSG_PM
+    call bios_print
+    
+    cli                     ; Desabilita interrupções
+    lgdt [gdt_descriptor]   ; Carrega a GDT
+
+    mov eax, cr0
+    or eax, 1               ; Liga o bit de Modo Protegido
+    mov cr0, eax
+
+    jmp CODE_SEG:start_protected_mode ; Salta para o código de 32-bits
+
+
+[bits 32]       ; Modo Protegido (32-bits)
+start_protected_mode:
+    ; 1. Recarregar Segmentos de DADOS com o seletor 0x10
+    mov ax, DATA_SEG
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    ; 2. Configurar Pilha Segura
+    mov ebp, 0x90000
+    mov esp, ebp
+
+    ; 3. Limpa a tela e escrever na memória de vídeo (VGA)
+    mov edi, 0xb8000
+    mov ecx, 1000      
+    mov eax, 0x0f200f20 
+    rep stosd           
+
+    mov byte [0xb8000], 'P'
+    mov byte [0xb8001], 0x2f
+    
+    mov byte [0xb8002], 'M'
+    mov byte [0xb8003], 0x2f
+    
+    mov byte [0xb8004], ' '
+    mov byte [0xb8005], 0x2f
+    
+    mov byte [0xb8006], 'O'
+    mov byte [0xb8007], 0x2f
+    
+    mov byte [0xb8008], 'K'
+    mov byte [0xb8009], 0x2f
+
+    jmp $ ; Trava infinita temporaria
+
+; Rotinas de BIOS e Utilitários (Modo Real)
+[bits 16]
+
 read_disk:
-    mov ah, 0x02                             ; Função de leitura de setores
-    mov bx, KERNEL_LOW_MEM                   ; Endereço de destino
-    mov al, 2                                ; Número de setores a ler
-    mov ch, 0                                ; Cilindro 0
-    mov dh, 0                                ; Cabeça 0
-    mov cl, 2                                ; Setor 2 (setores começam em 1 no BIOS)
-    mov dl, [BOOT_DISK]                      ; Disco de boot
-    int 0x13                                 ; Chamada de interrupção do BIOS
-    jc disk_error                            ; Se houver erro, salta para disk_error
-    cmp al, 2                                ; Verifica se leu 2 setores
-    jne disk_error                           ; Se não, salta para disk_error
+    mov ah, 0x02
+    mov bx, KERNEL_LOW_MEM
+    mov al, 2
+    mov ch, 0
+    mov dh, 0
+    mov cl, 2
+    mov dl, [BOOT_DISK]
+    int 0x13
+    jc disk_error
+    cmp al, 2
+    jne disk_error
     ret
 
-; Rotina de erro de disco
 disk_error:
-    mov bx, MSG_ERROR                        ; Mensagem de erro
-    call print_string                        ; Imprime a mensagem de erro
-    jmp $                                    ; Loop infinito
+    mov bx, MSG_ERROR
+    call bios_print
+    jmp $
 
-; Habilitar A20
 enable_a20:
     push ax
-    
-    ; Método 1
     mov ax, 0x2401
-    int 0x15                                ; Chamada de interrupção do BIOS para habilitar A20
-    jnc .enable_a20_done
-
-    ; Método 2 (Fallback)
+    int 0x15
+    jnc .done
     in al, 0x92
-    or al, 0x02
+    or al, 2
     out 0x92, al
-
-.enable_a20_done:
+.done:
     pop ax
     ret
 
-; Rotina para imprimir uma string terminada em zero
-print_string:
+bios_print:
     push ax
     push bx
-    mov ah, 0x0E                          ; Função de impressão de caractere
-.loop_print:
-    mov al, [bx]                          ; Carrega o próximo caractere
-    test al, al                           ; Verifica se é o terminador
-    je .done_print                        ; Se for, termina
-    int 0x10                              ; Chamada de interrupção do BIOS para imprimir
-    inc bx                                ; Próximo caractere
-    jmp .loop_print                       ; Repete
-.done_print:
+    mov ah, 0x0E
+.loop:
+    mov al, [bx]
+    test al, al
+    jz .done
+    int 0x10
+    inc bx
+    jmp .loop
+.done:
     pop bx
     pop ax
     ret
 
-; Espera 0,5 segundos
-delay_0_5s:
+bios_wait:
     push cx
     push dx
-    mov cx, 0x0007
+    push ax
+    mov cx, 0x0007  ; ~0.5s
     mov dx, 0xA120
-    call wait_time
+    mov ah, 0x86
+    int 0x15
+    pop ax
     pop dx
     pop cx
     ret
 
-; Espera em microsegundos, tempo definido em cx:dx, sendo cx a parte alta e dx a baixa
-wait_time:
-    push ax
-    mov ah, 0x86                          ; Função de espera
-    int 0x15                              ; Chamada de interrupção do BIOS
-    pop ax
-    ret
+; Dados e Mensagens
+BOOT_DISK:   db 0
+MSG_LOADING: db "Loading...", 0x0D, 0x0A, 0
+MSG_ERROR:   db "Disk Error!", 0x0D, 0x0A, 0
+MSG_A20:     db "A20 OK...", 0x0D, 0x0A, 0
+MSG_GDT:     db "GDT Load...", 0x0D, 0x0A, 0
+MSG_PM:      db "Going to 32-bits...", 0x0D, 0x0A, 0
 
-; Dados
-BOOT_DISK     db 0                              ; Armazena o ID do disco de boot
-MSG_LOADING   db "Loading Kernel...", 0x0D, 0x0A, 0
-MSG_ERROR     db "Error loading kernel!", 0x0D, 0x0A, 0
-MSG_SUCCESS   db "Kernel loaded successfully!", 0x0D, 0x0A, 0
-MSG_A20_ENABLED db "A20 line enabled.", 0x0D, 0x0A, 0
 
-; Assinatura para o final do setor de boot
-times 510-($-$$) db 0                      ; Preenche até o byte 510 com zeros
-dw 0xAA55                                  ; Assinatura do setor de boot
+; GDT (Global Descriptor Table)
+gdt_start:
+
+gdt_null:
+    dd 0x0
+    dd 0x0
+
+gdt_code:
+    ; Base=0x0, Limit=0xFFFFF, Access=0x9A (Exec/Read), Flags=0xC (4KB blocks)
+    dw 0xffff
+    dw 0x0
+    db 0x0
+    db 10011010b
+    db 11001111b
+    db 0x0
+
+gdt_data:
+    ; Base=0x0, Limit=0xFFFFF, Access=0x92 (Read/Write), Flags=0xC
+    dw 0xffff
+    dw 0x0
+    db 0x0
+    db 10010010b
+    db 11001111b
+    db 0x0
+
+gdt_end:
+
+gdt_descriptor:
+    dw gdt_end - gdt_start - 1
+    dd gdt_start
+
+CODE_SEG equ gdt_code - gdt_start
+DATA_SEG equ gdt_data - gdt_start
+
+
+; Padding e assinatura de boot sectors
+times 510-($-$$) db 0
+dw 0xAA55
