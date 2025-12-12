@@ -8,12 +8,13 @@ ENTRY(start)
 
 SECTIONS
 {
-    /* Kernel a partir do endereço 1MB */
-    . = 1M;
+    /* Kernel a partir do endereço 0x1000 */
+    . = 0x1000;
 
     /* Seção de código */
     .text :
     {
+        *(.boot)
         *(.text)
     }
 
