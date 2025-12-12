@@ -100,9 +100,9 @@ wait_time:
 
 ; Dados
 BOOT_DISK     db 0                              ; Armazena o ID do disco de boot
-MSG_LOADING   db "Carregando o kernel...", 0x0D, 0x0A, 0
-MSG_ERROR     db "Erro ao carregar o kernel!", 0x0D, 0x0A, 0
-MSG_SUCCESS   db "Kernel carregado com sucesso!", 0x0D, 0x0A, 0
+MSG_LOADING   db "Loading Kernel...", 0x0D, 0x0A, 0
+MSG_ERROR     db "Error loading kernel!", 0x0D, 0x0A, 0
+MSG_SUCCESS   db "Kernel loaded successfully!", 0x0D, 0x0A, 0
 
 ; Assinatura para o final do setor de boot
 times 510-($-$$) db 0                      ; Preenche até o byte 510 com zeros
