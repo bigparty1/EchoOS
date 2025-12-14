@@ -1,20 +1,19 @@
 #include "../driver/tty/tty.h"
+#include "../cpu/gdt/gdt.h"
+#include "../cpu/idt/idt.h"
 
 void kernel_main() {
-    terminal_initialize();
+    initialize();
     
-    // Passamos 0 no tamanho para ele calcular sozinho com o strlen que fizemos
-    terminal_print("EchoOS Kernel v0.2\n"); 
-    // terminal_write("------------------\n", 0);
-    
-    // Teste do scroll: Vamos imprimir 30 linhas
-    // for(int i = 0; i < 30; i++) {
-    //     terminal_write("Linha de teste de scroll... ", 0);
-    //     // Um truque simples para imprimir numero (ja que nao temos printf ainda)
-    //     char c = '0' + (i % 10);
-    //     terminal_putchar(c);
-    //     terminal_putchar('\n');
-    // }
+    print("Inicializando EchoOS ...\n");
+
+    gdt_init();
+    print("GDT inicializada com sucesso.\n");
+
+    idt_init();
+    print("IDT inicializada com sucesso.\n");
+
+    // __asm__ volatile ("int $3");
 
     while(1);
 }
