@@ -11,29 +11,29 @@ size_t terminal_column;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
 
-void terminal_initialize() 
+void initialize() 
 {
     terminal_row = 0;
     terminal_column = 0;
-    terminal_color = tty_entry_color(TTY_COLOR_LIGHT_GREY, TTY_COLOR_BLACK);
-    terminal_buffer = get_tty_buffer();
+    terminal_color = entry_color(TTY_COLOR_LIGHT_GREY, TTY_COLOR_BLACK);
+    terminal_buffer = get_buffer();
     for (size_t y = 0; y < TTY_HEIGHT; y++) 
     {
         for (size_t x = 0; x < TTY_WIDTH; x++) 
         {
             const size_t index = y * TTY_WIDTH + x;
-            terminal_buffer[index] = tty_entry(' ', terminal_color);
+            terminal_buffer[index] = entry(' ', terminal_color);
         }
     }
 }
 
-void terminal_putentryat(char c, uint8_t color, size_t x, size_t y) 
+void putentryat(char c, uint8_t color, size_t x, size_t y) 
 {
     const size_t index = y * TTY_WIDTH + x;
-    terminal_buffer[index] = tty_entry(c, color);
+    terminal_buffer[index] = entry(c, color);
 }
 
-void terminal_putchar(char c) 
+void putchar(char c) 
 {
     if (c == '\n') 
     {
@@ -46,7 +46,7 @@ void terminal_putchar(char c)
         return;
     }
 
-    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+    putentryat(c, terminal_color, terminal_column, terminal_row);
     terminal_column++;
 
     if (terminal_column == TTY_WIDTH) 
@@ -61,7 +61,7 @@ void terminal_putchar(char c)
     }
 }
 
-void terminal_write(const char* data, size_t size) 
+void write(const char* data, size_t size) 
 {
     if(data == NULL) 
     {
@@ -73,11 +73,11 @@ void terminal_write(const char* data, size_t size)
         {
             break;
         }
-        terminal_putchar(data[i]);
+        putchar(data[i]);
     }
 }
 
-void terminal_print(const char* data)
+void print(const char* data)
 {
     if(data == NULL) 
     {
@@ -85,7 +85,7 @@ void terminal_print(const char* data)
     }
     for (size_t i = 0; data[i] != '\0'; i++)
     {
-        terminal_putchar(data[i]);
+        putchar(data[i]);
     }
 }
 
@@ -101,6 +101,6 @@ void terminal_scroll()
 
     size_t last_row = (TTY_HEIGHT - 1) * TTY_WIDTH;
     for (size_t x = 0; x < TTY_WIDTH; x++) {
-        terminal_buffer[last_row + x] = tty_entry(' ', terminal_color);
+        terminal_buffer[last_row + x] = entry(' ', terminal_color);
     }
 }
