@@ -50,6 +50,10 @@ static inline uint16_t entry(unsigned char uc, uint8_t color)
     return (uint16_t)uc | (uint16_t)color << 8;
 }
 
+/// @brief Define a cor atual do terminal tty
+/// @param entry_color Cor combinada (Foreground e Background)
+void set_color(uint8_t entry_color);
+
 /// @brief Retorna um ponteiro para o buffer de vídeo tty
 /// @return Ponteiro para o buffer de vídeo tty
 static inline uint16_t* get_buffer() 

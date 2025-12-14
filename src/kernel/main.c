@@ -13,7 +13,12 @@ void kernel_main() {
     idt_init();
     print("IDT inicializada com sucesso.\n");
 
-    // __asm__ volatile ("int $3");
+    __asm__ volatile ("int $3");
+    // volatile int divisor = 0;
+    // int dividendo = 100;
+    // int resultado = dividendo / divisor;
+
+    print("Se voce ve isso, o sistema sobreviveu!\n");
 
     while(1);
 }

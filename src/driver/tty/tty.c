@@ -104,3 +104,8 @@ void terminal_scroll()
         terminal_buffer[last_row + x] = entry(' ', terminal_color);
     }
 }
+
+void set_color(uint8_t entry_color) 
+{
+    terminal_color = entry_color;
+}
