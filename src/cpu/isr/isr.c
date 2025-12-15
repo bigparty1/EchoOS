@@ -43,16 +43,11 @@ void isr_handler(isr_registers_t* regs) {
         // Mudar cor para Vermelho (Erro Crítico)
         set_color(entry_color(TTY_COLOR_RED, TTY_COLOR_BLACK));
         
-        print("\n[KERNEL PANIC] Excecao Recebida\n");
-
-        // print((char)regs->int_no + 48);
-        
-        // Imprime o nome do erro
-        // print(exception_messages[regs->int_no]);
-        print(exception_messages[0]);
+        print("\n[KERNEL PANIC] Excecao: ");
+        print(exception_messages[regs->int_no]);
         print("\n");
-
-        print("Sistema Parado por seguranca.\n");
+        
+        print("Sistema Parado.\n");
         
         // Loop infinito para travar o sistema (Halt)
         for (;;) {

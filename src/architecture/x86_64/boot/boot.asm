@@ -30,7 +30,7 @@ init_segments:
     ; 2. Carregar o Stage 2 (e o Kernel futuro) do disco
     ; Vamos ler 50 setores (aprox 25KB) para garantir que pegamos tudo
     mov bx, KERNEL_LOCATION ; Destino: 0x1000
-    mov al, 10              ; Quantidade: 10 setores
+    mov al, 20              ; Quantidade: 20 setores (~10KB)
     mov ch, 0
     mov dh, 0
     mov cl, 2               ; Começa do setor 2

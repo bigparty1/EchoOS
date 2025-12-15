@@ -89,29 +89,30 @@ start_protected_mode:
 
 setup_paging:
     ; Limpa as tabelas de paginação
-    mov edi, 0x2000
+    ; NOTA: Usar endereço 0x70000 para não conflitar com o kernel em 0x1000-0x5000
+    mov edi, 0x70000
     xor eax, eax
     mov ecx, 3072
     rep stosd
     
-    ; PML4[0] -> PDPT @ 0x3000
-    mov edi, 0x2000
-    mov eax, 0x3003
+    ; PML4[0] -> PDPT @ 0x71000
+    mov edi, 0x70000
+    mov eax, 0x71003
     mov [edi], eax
     
-    ; PDPT[0] -> PD @ 0x4000
-    mov edi, 0x3000
-    mov eax, 0x4003
+    ; PDPT[0] -> PD @ 0x72000
+    mov edi, 0x71000
+    mov eax, 0x72003
     mov [edi], eax
     
     ; PD[0] -> 2MB page @ 0x0 (huge page)
-    mov edi, 0x4000
+    mov edi, 0x72000
     mov eax, 0x83
     mov [edi], eax
     ret
 
 enable_paging_mode:
-    mov eax, 0x2000
+    mov eax, 0x70000
     mov cr3, eax
     mov eax, cr4
     or eax, 1 << 5
