@@ -1,4 +1,14 @@
 [bits 64]
+
+; ==============================================================================
+; Arquivo: isr_interrupts.asm
+; Descrição: Implementação de baixo nível das Interrupções de Serviço (ISRs)
+;            para o kernel. Este arquivo lida com a parte crítica de Assembly
+;            que a CPU exige ao tratar exceções e interrupções.
+; ==============================================================================
+
+; Exporta os símbolos para que o linker saiba que estas funções existem
+; e podem ser chamadas de outros arquivos (ex: idt.asm ou kernel.c).
 global idt_flush
 global isr0
 global isr1
@@ -33,65 +43,112 @@ global isr29
 global isr30
 global isr31
 
-; Macro para exceções que NÃO TÊM código de erro da CPU
+; ==============================================================================
+; MACROS: Geradores de ISRs
+; ==============================================================================
+
+; Macro para exceções que NÃO geram um código de erro na pilha da CPU.
+; Ex: Divisão por zero, Debug, etc.
+; Como o handler em C espera sempre um código de erro, empurramos um '0' falso.
 %macro ISR_NOERRCODE 1
     global isr%1
     isr%1:
-        cli             ; Desliga interrupções
-        push 0          ; Empurra dummy error code
-        push %1         ; Empurra o número da interrupção
-        jmp isr_common_stub
+        cli             ; Desliga interrupções para evitar aninhamento indesejado
+        push 0          ; Empurra um código de erro "dummy" (0) para padronizar a pilha
+        push %1         ; Empurra o número da interrupção (ex: 0, 1, 2...)
+        jmp isr_common_stub ; Salta para o código comum que salva o contexto
 %endmacro
 
-; Macro para exceções que TÊM código de erro da CPU
+; Macro para exceções que TÊM código de erro da CPU.
+; Ex: Page Fault, General Protection Fault.
+; A CPU já empurrou o erro automaticamente, então não precisamos do dummy.
 %macro ISR_ERRCODE 1
     global isr%1
     isr%1:
-        cli
-        ; Obs.: A CPU já empurrou o código de erro, não precisamos do dummy
+        cli             ; Desliga interrupções
+        ; A CPU já empurrou o código de erro na pilha automaticamente
         push %1         ; Empurra o número da interrupção
         jmp isr_common_stub
 %endmacro
 
-; --- DEFINIÇÃO DAS 32 EXCEÇÕES ---
-ISR_NOERRCODE 0   ; Divisão por Zero
-ISR_NOERRCODE 1   ; Debug
-ISR_NOERRCODE 2   ; NMI
-ISR_NOERRCODE 3   ; Breakpoint
-ISR_NOERRCODE 4   ; Overflow
-ISR_NOERRCODE 5   ; Bound Range
-ISR_NOERRCODE 6   ; Invalid Opcode
-ISR_NOERRCODE 7   ; Device Not Available
-ISR_ERRCODE   8   ; Double Fault (Tem erro)
-ISR_NOERRCODE 9   ; Coprocessor Segment Overrun
-ISR_ERRCODE   10  ; Invalid TSS (Tem erro)
-ISR_ERRCODE   11  ; Segment Not Present (Tem erro)
-ISR_ERRCODE   12  ; Stack-Segment Fault (Tem erro)
-ISR_ERRCODE   13  ; General Protection Fault (GPF) (Tem erro)
-ISR_ERRCODE   14  ; Page Fault (Tem erro)
-ISR_NOERRCODE 15  ; Reservado
-ISR_NOERRCODE 16  ; x87 FPU Error
-ISR_ERRCODE   17  ; Alignment Check
-ISR_NOERRCODE 18  ; Machine Check
-ISR_NOERRCODE 19  ; SIMD Float Exception
-ISR_NOERRCODE 20  ; Virtualization Exception
-ISR_NOERRCODE 21  ; Reservado
-ISR_NOERRCODE 22  ; Reservado
-ISR_NOERRCODE 23  ; Reservado
-ISR_NOERRCODE 24  ; Reservado
-ISR_NOERRCODE 25  ; Reservado
-ISR_NOERRCODE 26  ; Reservado
-ISR_NOERRCODE 27  ; Reservado
-ISR_NOERRCODE 28  ; Reservado
-ISR_NOERRCODE 29  ; Reservado
-ISR_ERRCODE   30  ; Security Exception
-ISR_NOERRCODE 31  ; Reservado
+; ==============================================================================
+; DEFINIÇÃO DAS 32 EXCEÇÕES (INTERRUPÇÕES)
+; ==============================================================================
 
-; Função C chamada por todas as ISRs
+; 0-7: Exceções sem código de erro
+ISR_NOERRCODE 0   ; #DE - Divisão por Zero (Divide Error)
+ISR_NOERRCODE 1   ; #DB - Debug (Breakpoint)
+ISR_NOERRCODE 2   ; #NMI - Non-Maskable Interrupt
+ISR_NOERRCODE 3   ; #BP - Breakpoint
+ISR_NOERRCODE 4   ; #OF - Overflow
+ISR_NOERRCODE 5   ; #BR - Bound Range Exceeded
+ISR_NOERRCODE 6   ; #UD - Invalid Opcode (Instruction Undefined)
+ISR_NOERRCODE 7   ; #NM - Device Not Available (x87 FPU / SIMD)
+
+; 8: Double Fault (Tem erro)
+ISR_ERRCODE   8   ; #DF - Double Fault (Falha dupla, grave)
+
+; 9: Coprocessor Segment Overrun (Sem erro)
+ISR_NOERRCODE 9   ; #TS - Coprocessor Segment Overrun
+
+; 10-11: Invalid TSS / Segment Not Present (Tem erro)
+ISR_ERRCODE   10  ; #TS - Invalid TSS (Task State Segment)
+ISR_ERRCODE   11  ; #NP - Segment Not Present
+
+; 12-13: Stack-Segment Fault / GPF (Tem erro)
+ISR_ERRCODE   12  ; #SS - Stack-Segment Fault
+ISR_ERRCODE   13  ; #GP - General Protection Fault (GPF) - Muito comum!
+
+; 14: Page Fault (Tem erro) - O mais importante para gerenciamento de memória
+ISR_ERRCODE   14  ; #PF - Page Fault (Acesso a memória inválida)
+
+; 15: Reservado (Sem erro)
+ISR_NOERRCODE 15  ; #RS - Reserved
+
+; 16: x87 FPU Error (Sem erro)
+ISR_NOERRCODE 16  ; #MF - x87 FPU / SIMD Floating-Point Exception
+
+; 17: Alignment Check (Tem erro)
+ISR_ERRCODE   17  ; #AC - Alignment Check
+
+; 18-20: Machine Check / SIMD / Virtualization (Sem erro)
+ISR_NOERRCODE 18  ; #MC - Machine Check Exception
+ISR_NOERRCODE 19  ; #XM - SIMD Floating-Point Exception
+ISR_NOERRCODE 20  ; #VE - Virtualization Exception
+
+; 21-29: Reservados (Sem erro)
+ISR_NOERRCODE 21  ; #RS - Reserved
+ISR_NOERRCODE 22  ; #RS - Reserved
+ISR_NOERRCODE 23  ; #RS - Reserved
+ISR_NOERRCODE 24  ; #RS - Reserved
+ISR_NOERRCODE 25  ; #RS - Reserved
+ISR_NOERRCODE 26  ; #RS - Reserved
+ISR_NOERRCODE 27  ; #RS - Reserved
+ISR_NOERRCODE 28  ; #RS - Reserved
+ISR_NOERRCODE 29  ; #RS - Reserved
+
+; 30: Security Exception (Tem erro)
+ISR_ERRCODE   30  ; #SX - Security Exception
+
+; 31: Reservado (Sem erro)
+ISR_NOERRCODE 31  ; #RS - Reserved
+
+; ==============================================================================
+; STUB COMUM (isr_common_stub)
+; ==============================================================================
+
+; Declara que a função 'isr_handler' existe em outro arquivo (provavelmente em C).
+; Ela será chamada após salvarmos o contexto da CPU.
 extern isr_handler 
 
 isr_common_stub:
-    ; 1. Salvar TODO o estado dos registradores (Context Save)
+    ; --------------------------------------------------------------------------
+    ; 1. SALVAR O CONTEXTO (Context Save)
+    ; --------------------------------------------------------------------------
+    ; Precisamos salvar todos os registradores porque o código em C pode
+    ; modificá-los. Se não salvássemos, o programa que estava rodando
+    ; antes da interrupção ficaria corrompido.
+    ; A ordem é importante: o último empurrado será o primeiro a ser restaurado.
     push r15
     push r14
     push r13
@@ -108,13 +165,22 @@ isr_common_stub:
     push rbx
     push rax
 
-    ; 2. Chamar o Kernel em C
-    ; O GCC espera que o primeiro argumento esteja em RDI.
-    ; RSP aponta para o topo da pilha, onde salvamos tudo isso.
+    ; --------------------------------------------------------------------------
+    ; 2. CHAMAR O HANDLER EM C
+    ; --------------------------------------------------------------------------
+    ; A convenção de chamada do GCC (System V AMD64 ABI) diz que o primeiro
+    ; argumento deve estar no registrador RDI.
+    ; Nós passamos o endereço do topo da pilha (RSP), que agora aponta para
+    ; a estrutura de dados contendo o código de erro, número da ISR e os registradores.
     mov rdi, rsp
+    
+    ; Chama a função em C que vai processar a interrupção (logar, panic, etc.)
     call isr_handler
 
-    ; 3. Restaurar TODO o estado (Context Restore)
+    ; --------------------------------------------------------------------------
+    ; 3. RESTAURAR O CONTEXTO (Context Restore)
+    ; --------------------------------------------------------------------------
+    ; Após o retorno do C, restauramos os registradores na ordem inversa.
     pop rax
     pop rbx
     pop rcx
@@ -131,8 +197,19 @@ isr_common_stub:
     pop r14
     pop r15
 
-    ; Remove o código de erro e o número da ISR da pilha (2 valores de 64 bits = 16 bytes)
+    ; --------------------------------------------------------------------------
+    ; 4. LIMPEZA DA PILHA (Stack Cleanup)
+    ; --------------------------------------------------------------------------
+    ; A pilha contém: [Registradores] [Número da ISR] [Código de Erro]
+    ; Nós já restauramos os registradores com 'pop'.
+    ; Agora precisamos remover o Número da ISR e o Código de Erro para que
+    ; a pilha esteja limpa para o 'iretq'.
+    ; Cada valor é 64 bits (8 bytes). 2 valores = 16 bytes.
     add rsp, 16 
 
-    ; Retorna da interrupção (Recupera RIP, CS, RFLAGS)
+    ; --------------------------------------------------------------------------
+    ; 5. RETORNO DA INTERRUPÇÃO
+    ; --------------------------------------------------------------------------
+    ; 'iretq' (Interrupt Return for 64-bit) recupera o RIP, CS e RFLAGS
+    ; da pilha e retorna ao código que estava executando antes da interrupção.
     iretq
